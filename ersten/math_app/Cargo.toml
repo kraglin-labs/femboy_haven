@@ -1,10 +1,7 @@
 [package]
-name = "math_app"
+name = "night_walker"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-
-[lib]
-name = "rust_math"
-crate-type = ["cdylib"]
+walkdir = "2"

@@ -1,26 +1,39 @@
-use std::ffi::CStr;
-use std::os::raw::c_char;
+use std::fs;
+use std::io;
+use std::path::Path;
 
-#[no_mangle]
-pub extern "C" fn palindrome_checker(word: *const c_char) -> bool {
-    #[no_mangle]
-pub extern "C" fn palindrome_checker(word_ptr: *const std::os::raw::c_char) -> bool {
-    if word_ptr.is_null() {
-        return false;
+#[derive(Debug)]
+enum Entry {
+    File(String),
+    Dir(String, Vec<Entry>)
+}
+
+fn crawl(path: &Path) -> io::Result<Vec<Entry>>{
+    let mut list = Vec::new();
+
+    for item in fs::read_dir(path)? {
+        let item = item?;
+        let name = item.file_name().to_string_lossy().into_owned();
+
+        if item.path().is_dir() {
+            let children = crawl(&item.path())?;
+            list.push(Entry::Dir(name, children));
+        } else {
+            list.push(Entry::File(name));
+        }
     }
 
-    // --- UNSAFE BOUNDARY (keep it tiny) ---
-    let word = unsafe {
-        let c_str = std::ffi::CStr::from_ptr(word_ptr);
-        match c_str.to_str() {
-            Ok(s) => s,
-            Err(_) => return false,
-        }
-    };
-    // -------------------------------------
-
-    // Back to safe Rust! No more unsafe blocks needed.
-    let reversed: String = word.chars().rev().collect();
-    reversed == word
+    list.sort_by(|a, b| {
+        let (Entry::Dir(n1, _) | Entry::File(n1)) = a;
+        let (Entry::Dir(n2, _) | Entry::File(n2)) = b;
+        n1.cmp(n2)
+    });
+    Ok(list)
 }
-} 
+
+fn main() -> io::Result<()>{
+    let path = ".";
+    let tree = crawl(Path::new(path))?;
+    println!("{:#?}", tree);
+    Ok(())
+}
