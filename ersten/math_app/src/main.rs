@@ -1,9 +1,12 @@
 #[link(name = "math", kind = "dylib")]
-extern "C" {
+unsafe extern "C" {
+    fn power(base: i32, exponent: i32) -> i32;
     fn multiply(a: i32, b: i32) -> i32;
 }
 
-fn main3() {
-    let result = unsafe { multiply_numbers(6, 7) };
-    println!("Result from C++ code: {}", result);
+fn main() {
+    let multiplication = unsafe { multiply(6, 9) };
+    let exponential = unsafe { power(7, 14) };
+    println!(" 6 * 9 = {}", multiplication);
+    println!(" 7 ** 14 = {}", exponential);
 }
