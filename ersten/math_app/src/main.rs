@@ -8,14 +8,14 @@ enum Action {
     Restoration,
 }
 
-fn crawl(path: &str, files: &mut Vec<String>, ignore_list: &[&str]) -> io::Result<()> {
+fn crawl(path: &str, files: &mut Vec<String>, ignore_list: &[String]) -> io::Result<()> {
     for item in fs::read_dir(path)? {
         let item = item?;
         let item_path = item.path();
         
         if let Some(name_os) = item_path.file_name() {
             let name = name_os.to_string_lossy();            
-            if ignore_list.contains(&name.as_ref()) {
+            if ignore_list.iter().any(|ignore| ignore == &name) {
                 continue;
             }
         }
@@ -87,31 +87,59 @@ fn main() -> io::Result<()> {
     let target_path = "/home/sakis/femboy_haven";
     let backup_folder = "/home/sakis/femboy_backup";
     let replace_text = "Taken 1-3\n";
-    let ignore = vec!["target", ".git"];
 
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
         println!("Usage:");
-        println!("  ./main --steal      (Crawls target, backs up, and replaces content)");
-        println!("  ./main --restore    (Restores files from backup folder)");
+        println!("  ./main --steal [-i \"file1|folder1|...\"]");
+        println!("  ./main --restore");
         return Ok(());
     }
 
-    let current_action = match args[1].as_str() {
-        "steal" | "--steal" | "-steal" => Action::Steal,
-        "restore" | "--restore" | "-restore" => Action::Restoration,
-        _ => {
-            println!("Invalid argument. Use '--steal' or '--restore'.");
+    let mut ignore_list: Vec<String> = vec!["target".to_string(), ".git".to_string()];
+
+    let mut current_action: Option<Action> = None;
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "steal" | "--steal" | "-steal" => {
+                current_action = Some(Action::Steal);
+            }
+            "restore" | "--restore" | "-restore" => {
+                current_action = Some(Action::Restoration);
+            }
+            "-i" | "--ignore" => {
+                if i + 1 < args.len() {
+                    let user_ignores = args[i + 1].split('|');
+                    for item in user_ignores {
+                        let trimmed = item.trim().to_string();
+                        if !trimmed.is_empty() && !ignore_list.contains(&trimmed) {
+                            ignore_list.push(trimmed);
+                        }
+                    }
+                    i += 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    let action = match current_action {
+        Some(act) => act,
+        None => {
+            println!("Invalid or missing action. Use '--steal' or '--restore'.");
             return Ok(());
         }
     };
 
-    match current_action {
+    match action {
         Action::Steal => {
             let mut files = Vec::new();
-            println!("Crawling target path...");
-            crawl(target_path, &mut files, &ignore)?;
+            println!("Crawling target path with ignore list: {:?}", ignore_list);
+            crawl(target_path, &mut files, &ignore_list)?;
             
             println!("Backing up and replacing files...");
             stealer(&files, backup_folder, replace_text)?;
